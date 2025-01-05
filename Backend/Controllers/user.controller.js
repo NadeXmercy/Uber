@@ -43,8 +43,15 @@ module.exports.loginUser = async (req, res) => {
   if (!isMatch) {
     return res.status(401).json({ message: "Invalid email or password" });
   }
+
   const tokens = user.generateAuthToken();
-  res.cookie("token", tokens);
+
+  res.cookie("token", JSON.stringify(tokens), {
+    httpOnly: true, // Prevents access to the token via JavaScript
+    secure: process.env.NODE_ENV === "production", // Set to true for production environments (HTTPS)
+    maxAge: 24 * 60 * 60 * 1000, // Optional: set cookie expiry time
+  });
+
   res.status(200).json({ tokens, user });
 };
 
@@ -54,8 +61,12 @@ module.exports.getProfile = async (req, res) => {
 };
 
 module.exports.logoutUser = async (req, res) => {
-  res.clearCookie("token");
   const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
-  await blacklistModel.create({ token });
+
+  if (token) {
+    await blacklistModel.create({ token });
+    res.clearCookie("token"); // Explicitly clear the cookie
+  }
+
   res.status(200).json({ message: "Logout successful" });
 };
